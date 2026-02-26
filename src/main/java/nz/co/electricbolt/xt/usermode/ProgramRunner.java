@@ -113,10 +113,15 @@ public class ProgramRunner implements CPUDelegate {
 
     @Override
     public void interrupt(final byte interrupt) {
-        interrupts.execute(cpu, interrupt, trace, directoryTranslation);
-        cpu.getReg().IP.setValue(cpu.pop16());
-        cpu.getReg().CS.setValue(cpu.pop16());
-        cpu.pop16(); // flags should be passed through.
+        boolean handled = interrupts.execute(cpu, interrupt, trace, directoryTranslation);
+        if (handled) {
+            // Java handler processed the interrupt — restore return address from stack
+            cpu.getReg().IP.setValue(cpu.pop16());
+            cpu.getReg().CS.setValue(cpu.pop16());
+            cpu.pop16(); // flags should be passed through.
+        }
+        // If not handled, CPU.interrupt() already set CS:IP to the IVT entry and the
+        // return address is on the stack. The IVT handler will execute and IRET back.
     }
 
     @Override

@@ -88,7 +88,7 @@ public class Interrupts {
      * Invokes a method that handles the interrupt ‣ function ‣ subfunction. Currently only supports AH (function) and
      * optional an AL (subfunction).
      */
-    public void execute(final CPU cpu, final byte interrupt, final Trace trace, final DirectoryTranslation directoryTranslation) {
+    public boolean execute(final CPU cpu, final byte interrupt, final Trace trace, final DirectoryTranslation directoryTranslation) {
         // Check for interrupt + AH match.
         String key = String.format("%02X %02X", interrupt, cpu.getReg().AH.getValue());
         InterruptImpl impl = implMap.get(key);
@@ -101,11 +101,8 @@ public class Interrupts {
                 key = String.format("%02X", interrupt);
                 impl = implMap.get(key);
                 if (impl == null) {
-                    trace.log(String.format("Unhandled interrupt %02X%n", interrupt));
-                    trace.log(cpu.getReg().toString());
-                    System.err.printf("Unhandled interrupt %02X%n", interrupt);
-                    System.err.println(cpu.getReg().toString());
-                    System.exit(255);
+                    // No Java handler — fall through to IVT handler
+                    return false;
                 }
             }
         }
@@ -195,6 +192,7 @@ public class Interrupts {
             System.err.println(cpu.getReg().toString());
             System.exit(255);
         }
+        return true;
     }
 
     /**

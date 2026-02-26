@@ -149,6 +149,24 @@ public class Memory {
     }
 
     /**
+     * Gets a 32-bit doubleword from memory at the specified segment:offset without any memory protection bits.
+     * Whilst reading the 4 bytes from memory, the offset value can wrap from 0xFFFF to 0x0000. If the segment:offset
+     * computes to a linear address of greater than 0xFFFFF, it is wrapped around to the beginning of the address space
+     * at 0x00000.
+     */
+    public int getDoubleWord(SegOfs segOfs) {
+        segOfs = segOfs.copy();
+        int value = getByte(segOfs) & 0xFF;
+        segOfs.increment();
+        value |= (getByte(segOfs) & 0xFF) << 8;
+        segOfs.increment();
+        value |= (getByte(segOfs) & 0xFF) << 16;
+        segOfs.increment();
+        value |= (getByte(segOfs) & 0xFF) << 24;
+        return value;
+    }
+
+    /**
      * Sets a 32-bit word to memory at the specified segment:offset without any memory protection bits.
      * Whilst writing the 4 bytes to memory, the offset value can wrap from 0xFFFF to 0x0000. If the segment:offset
      * computes to a linear address of greater than 0xFFFFF, it is wrapped around to the beginning of the address space

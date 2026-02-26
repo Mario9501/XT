@@ -9,6 +9,7 @@ public class CPU {
     final Memory memory = new Memory(this);
     final ModRegRM modRegRM = new ModRegRM(this);
     final ALU alu = new ALU(reg.flags);
+    final FPU fpu = new FPU();
     final BCDInstructions bcd = new BCDInstructions(reg);
     final StringInstructions string = new StringInstructions(this);
     final Group1Instructions group1 = new Group1Instructions(this);
@@ -41,6 +42,10 @@ public class CPU {
 
     public RegSet getReg() {
         return reg;
+    }
+
+    public FPU getFpu() {
+        return fpu;
     }
 
     /**
