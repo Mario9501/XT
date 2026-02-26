@@ -69,6 +69,7 @@ public class Interrupts {
 
     public Interrupts() {
         this.implMap = new TreeMap<>();
+        loadClass("bios.Equipment");
         loadClass("bios.TimeDate");
         loadClass("bios.Video");
         loadClass("dos.ConsoleIO");

@@ -78,4 +78,19 @@ public class Video {
         cpu.getReg().AL.setValue((byte) 0x03); // mode 3 = 80x25 color text
         cpu.getReg().BH.setValue((byte) 0x00); // active page
     }
+
+    @Interrupt(interrupt = 0x10, function = 0x12, description = "EGA alternate select / video subsystem config")
+    public void egaAlternateSelect(final CPU cpu, final Trace trace) {
+        // BL=10h on entry means "get EGA info". If BL stays 10h on return,
+        // the caller knows EGA is not present. Since XT emulates a basic
+        // CGA-class display, we leave BL unchanged (no-op).
+    }
+
+    @Interrupt(interrupt = 0x10, function = 0x1A, description = "VGA display combination code")
+    public void vgaDisplayCombination(final CPU cpu, final Trace trace) {
+        // AL returns 1Ah if VGA BIOS present. Since XT emulates a basic CGA
+        // display, return AL=00h to indicate this function is not supported.
+        // This causes video detection code to fall through to older methods.
+        cpu.getReg().AL.setValue((byte) 0x00);
+    }
 }
