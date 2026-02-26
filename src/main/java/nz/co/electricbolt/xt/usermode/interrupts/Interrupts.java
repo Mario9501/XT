@@ -79,7 +79,12 @@ public class Interrupts {
         loadClass("dos.Misc");
         loadClass("dos.Memory");
         loadClass("dos.TimeDate");
-        loadClass("dos.FPEmulation");
+        // FP handlers (INT 34h-3Dh) are all disabled — MS C's EM.LIB provides
+        // software FP emulation via IVT handlers installed at program startup.
+        // Java-side FPU emulation is incompatible with SLIBFP.LIB's runtime
+        // which uses INT 3Ch as an internal library function, not a standard
+        // segment override FP instruction.
+        // loadClass("dos.FPEmulation");
         loadClass("dos.ProcessExec");
         loadClass("dos.TerminateProgram");
     }

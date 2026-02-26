@@ -25,7 +25,7 @@ import nz.co.electricbolt.xt.usermode.util.Trace;
 public class FPEmulation {
 
     // Temporary debug tracing — set to false to disable
-    private static final boolean TRACE = true;
+    private static final boolean TRACE = false;
     private static int traceCount = 0;
 
     private void trace(String msg, CPU cpu) {
@@ -332,7 +332,7 @@ public class FPEmulation {
                 fpu.setST(0, fpu.getST(0) * (Math.log1p(x) / Math.log(2.0)));
             }
             case 2 -> fpu.setST(0, Math.sqrt(fpu.getST(0)));           // FSQRT
-            case 4 -> fpu.setST(0, Math.rint(fpu.getST(0)));           // FRNDINT
+            case 4 -> fpu.setST(0, fpu.roundByMode(fpu.getST(0)));     // FRNDINT
             case 5 -> {                                                  // FSCALE: ST(0) = ST(0) * 2^trunc(ST(1))
                 int scale = (int) fpu.getST(1);
                 fpu.setST(0, fpu.getST(0) * Math.pow(2.0, scale));
@@ -407,8 +407,8 @@ public class FPEmulation {
             }
             switch (op.reg) {
                 case 0 -> fpu.push(FPU.readInt32(mem, op.addr));         // FILD m32int
-                case 2 -> FPU.writeInt32(mem, op.addr, fpu.getST(0));    // FIST m32int
-                case 3 -> FPU.writeInt32(mem, op.addr, fpu.pop());       // FISTP m32int
+                case 2 -> fpu.writeInt32(mem, op.addr, fpu.getST(0));    // FIST m32int
+                case 3 -> fpu.writeInt32(mem, op.addr, fpu.pop());       // FISTP m32int
                 case 5 -> fpu.push(FPU.readFloat80(mem, op.addr));       // FLD m80
                 case 7 -> FPU.writeFloat80(mem, op.addr, fpu.pop());     // FSTP m80
             }
@@ -596,10 +596,12 @@ public class FPEmulation {
             }
             switch (op.reg) {
                 case 0 -> fpu.push(FPU.readInt16(mem, op.addr));         // FILD m16int
-                case 2 -> FPU.writeInt16(mem, op.addr, fpu.getST(0));    // FIST m16int
-                case 3 -> FPU.writeInt16(mem, op.addr, fpu.pop());       // FISTP m16int
+                case 2 -> fpu.writeInt16(mem, op.addr, fpu.getST(0));    // FIST m16int
+                case 3 -> fpu.writeInt16(mem, op.addr, fpu.pop());       // FISTP m16int
+                case 4 -> fpu.push(FPU.readBCD(mem, op.addr));           // FBLD m80bcd
                 case 5 -> fpu.push(FPU.readInt64(mem, op.addr));         // FILD m64int
-                case 7 -> FPU.writeInt64(mem, op.addr, fpu.pop());       // FISTP m64int
+                case 6 -> FPU.writeBCD(mem, op.addr, fpu.pop());         // FBSTP m80bcd
+                case 7 -> fpu.writeInt64(mem, op.addr, fpu.pop());       // FISTP m64int
             }
         } else {
             // Register form: DF E0 = FNSTSW AX
@@ -729,8 +731,8 @@ public class FPEmulation {
     private void execDB_memory(final FPU fpu, final Memory mem, final DecodedOperand op) {
         switch (op.reg) {
             case 0 -> fpu.push(FPU.readInt32(mem, op.addr));
-            case 2 -> FPU.writeInt32(mem, op.addr, fpu.getST(0));
-            case 3 -> FPU.writeInt32(mem, op.addr, fpu.pop());
+            case 2 -> fpu.writeInt32(mem, op.addr, fpu.getST(0));
+            case 3 -> fpu.writeInt32(mem, op.addr, fpu.pop());
             case 5 -> fpu.push(FPU.readFloat80(mem, op.addr));
             case 7 -> FPU.writeFloat80(mem, op.addr, fpu.pop());
         }
@@ -776,10 +778,12 @@ public class FPEmulation {
     private void execDF_memory(final CPU cpu, final FPU fpu, final Memory mem, final DecodedOperand op) {
         switch (op.reg) {
             case 0 -> fpu.push(FPU.readInt16(mem, op.addr));
-            case 2 -> FPU.writeInt16(mem, op.addr, fpu.getST(0));
-            case 3 -> FPU.writeInt16(mem, op.addr, fpu.pop());
+            case 2 -> fpu.writeInt16(mem, op.addr, fpu.getST(0));
+            case 3 -> fpu.writeInt16(mem, op.addr, fpu.pop());
+            case 4 -> fpu.push(FPU.readBCD(mem, op.addr));
             case 5 -> fpu.push(FPU.readInt64(mem, op.addr));
-            case 7 -> FPU.writeInt64(mem, op.addr, fpu.pop());
+            case 6 -> FPU.writeBCD(mem, op.addr, fpu.pop());
+            case 7 -> fpu.writeInt64(mem, op.addr, fpu.pop());
         }
     }
 

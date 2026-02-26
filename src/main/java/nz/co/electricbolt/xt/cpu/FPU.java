@@ -310,17 +310,17 @@ public class FPU {
     }
 
     /**
-     * Write 16-bit signed integer to memory (truncates toward zero).
+     * Write 16-bit signed integer to memory, rounded using current rounding mode.
      */
-    public static void writeInt16(Memory mem, SegOfs addr, double value) {
+    public void writeInt16(Memory mem, SegOfs addr, double value) {
         short intVal = (short) roundToInt(value);
         mem.setWord(addr, intVal);
     }
 
     /**
-     * Write 32-bit signed integer to memory (truncates toward zero).
+     * Write 32-bit signed integer to memory, rounded using current rounding mode.
      */
-    public static void writeInt32(Memory mem, SegOfs addr, double value) {
+    public void writeInt32(Memory mem, SegOfs addr, double value) {
         addr = addr.copy();
         int intVal = (int) roundToInt(value);
         mem.setByte(addr, (byte) intVal);
@@ -333,13 +333,58 @@ public class FPU {
     }
 
     /**
-     * Write 64-bit signed integer to memory.
+     * Write 64-bit signed integer to memory, rounded using current rounding mode.
      */
-    public static void writeInt64(Memory mem, SegOfs addr, double value) {
+    public void writeInt64(Memory mem, SegOfs addr, double value) {
         addr = addr.copy();
         long intVal = roundToInt(value);
         for (int i = 0; i < 8; i++) {
             mem.setByte(addr, (byte) (intVal >> (i * 8)));
+            addr.increment();
+        }
+    }
+
+    /**
+     * Read 80-bit packed BCD from memory (FBLD). Format: 9 bytes of packed BCD digits
+     * (18 digits, least significant byte first), 1 byte sign (bit 7).
+     */
+    public static double readBCD(Memory mem, SegOfs addr) {
+        addr = addr.copy();
+        byte[] bytes = new byte[10];
+        for (int i = 0; i < 10; i++) {
+            bytes[i] = mem.getByte(addr);
+            addr.increment();
+        }
+        boolean sign = (bytes[9] & 0x80) != 0;
+        long result = 0;
+        // 9 bytes = 18 BCD digits, most significant digit in high nibble of byte[8]
+        for (int i = 8; i >= 0; i--) {
+            int hi = (bytes[i] >> 4) & 0x0F;
+            int lo = bytes[i] & 0x0F;
+            result = result * 100 + hi * 10 + lo;
+        }
+        return sign ? -(double) result : (double) result;
+    }
+
+    /**
+     * Write 80-bit packed BCD to memory (FBSTP). Rounds ST(0) to integer, stores as
+     * 18-digit packed BCD (9 bytes) + 1 sign byte. Pops ST(0).
+     */
+    public static void writeBCD(Memory mem, SegOfs addr, double value) {
+        addr = addr.copy();
+        boolean sign = value < 0;
+        long intVal = Math.round(Math.abs(value));
+        byte[] bytes = new byte[10];
+        for (int i = 0; i < 9; i++) {
+            int lo = (int) (intVal % 10);
+            intVal /= 10;
+            int hi = (int) (intVal % 10);
+            intVal /= 10;
+            bytes[i] = (byte) ((hi << 4) | lo);
+        }
+        bytes[9] = (byte) (sign ? 0x80 : 0x00);
+        for (int i = 0; i < 10; i++) {
+            mem.setByte(addr, bytes[i]);
             addr.increment();
         }
     }
@@ -456,10 +501,25 @@ public class FPU {
     }
 
     /**
-     * Round double to long integer using current rounding mode.
-     * Default rounding mode (control word bits 11-10 = 00) is round to nearest.
+     * Round double to integer (as double) using current rounding mode from control word bits 10-11.
+     * 00 = round to nearest (even), 01 = round toward -inf (floor),
+     * 10 = round toward +inf (ceil), 11 = round toward zero (truncate).
      */
-    private static long roundToInt(double value) {
-        return Math.round(value);
+    public double roundByMode(double value) {
+        int mode = (controlWord >> 10) & 3;
+        switch (mode) {
+            case 0:  return Math.rint(value);       // nearest even
+            case 1:  return Math.floor(value);      // toward -infinity
+            case 2:  return Math.ceil(value);       // toward +infinity
+            case 3:  return (double)(long) value;   // toward zero (truncate)
+            default: return Math.rint(value);
+        }
+    }
+
+    /**
+     * Round double to long integer using current rounding mode from control word.
+     */
+    public long roundToInt(double value) {
+        return (long) roundByMode(value);
     }
 }
