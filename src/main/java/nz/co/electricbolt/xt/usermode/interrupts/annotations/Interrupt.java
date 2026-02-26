@@ -9,7 +9,7 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD})
 public @interface Interrupt {
     int interrupt() default 0x21;
-    int function();
+    int function() default -1;
     int subfunction() default -1;
     String description();
 }

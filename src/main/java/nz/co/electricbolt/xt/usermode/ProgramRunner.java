@@ -58,7 +58,17 @@ public class ProgramRunner implements CPUDelegate {
 
     public void loadAndExecute() {
         final EnvironmentVariables environment = new EnvironmentVariables(cpu.getMemory(), (short) 0x0050, (short) 0x0000);
-        environment.writeVariable("PATH", "C:\\");
+        environment.writeVariable("PATH", "C:\\;C:\\BIN");
+
+        // Import DOS environment variables passed from parent xt process via EXEC.
+        // These are stored as Java environment variables prefixed with "XT_DOS_ENV_".
+        for (final java.util.Map.Entry<String, String> entry : System.getenv().entrySet()) {
+            if (entry.getKey().startsWith("XT_DOS_ENV_")) {
+                final String dosKey = entry.getKey().substring("XT_DOS_ENV_".length());
+                environment.writeVariable(dosKey, entry.getValue());
+            }
+        }
+
         environment.writeExecutablePath(directoryTranslation.hostPathToEmulatedPath(programPath));
 
         final ProgramSegmentPrefix psp = new ProgramSegmentPrefix(cpu.getMemory(), (short) 0x0090, (short) 0x0000);

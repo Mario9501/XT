@@ -28,7 +28,7 @@ public class DiskFile extends BaseFile {
             file = new File(filename);
             final String mode = switch (accessMode) {
                 case readOnly -> "r";
-                case writeOnly -> "w";
+                case writeOnly -> "rw"; // RandomAccessFile doesn't support "w", use "rw" instead.
                 case readWrite -> "rw";
             };
             randomAccessFile = new RandomAccessFile(file, mode);

@@ -70,6 +70,7 @@ public class Interrupts {
     public Interrupts() {
         this.implMap = new TreeMap<>();
         loadClass("bios.TimeDate");
+        loadClass("bios.Video");
         loadClass("dos.ConsoleIO");
         loadClass("dos.FileDateTime");
         loadClass("dos.FileIO");
@@ -77,6 +78,8 @@ public class Interrupts {
         loadClass("dos.Misc");
         loadClass("dos.Memory");
         loadClass("dos.TimeDate");
+        loadClass("dos.FPEmulation");
+        loadClass("dos.ProcessExec");
         loadClass("dos.TerminateProgram");
     }
 
@@ -93,11 +96,16 @@ public class Interrupts {
             key = String.format("%02X %02X %02X", interrupt, cpu.getReg().AH.getValue(), cpu.getReg().AL.getValue());
             impl = implMap.get(key);
             if (impl == null) {
-                trace.log(String.format("Unhandled interrupt %02X%n", interrupt));
-                trace.log(cpu.getReg().toString());
-                System.err.printf("Unhandled interrupt %02X%n", interrupt);
-                System.err.println(cpu.getReg().toString());
-                System.exit(255);
+                // Check for catch-all handler (function = -1, stored as "XX").
+                key = String.format("%02X", interrupt);
+                impl = implMap.get(key);
+                if (impl == null) {
+                    trace.log(String.format("Unhandled interrupt %02X%n", interrupt));
+                    trace.log(cpu.getReg().toString());
+                    System.err.printf("Unhandled interrupt %02X%n", interrupt);
+                    System.err.println(cpu.getReg().toString());
+                    System.exit(255);
+                }
             }
         }
 
@@ -146,7 +154,7 @@ public class Interrupts {
             } else if (parameter.getType() == int.class) {
                 final Reg16 hi = annotationToReg16(cpu, annotations[0]);
                 final Reg16 lo = annotationToReg16(cpu, annotations[1]);
-                final int value = (hi.getValue() << 16 & 0xFFFF) | (lo.getValue() & 0xFFFF);
+                final int value = ((hi.getValue() & 0xFFFF) << 16) | (lo.getValue() & 0xFFFF);
                 debugBuf.append(String.format("%s,%s=%08X", hi.getName(), lo.getName(), value));
                 args[p] = value;
             } else if (parameter.getType() == SegOfs.class) {
@@ -220,15 +228,21 @@ public class Interrupts {
                         final StringBuilder keyBuf = new StringBuilder();
                         final StringBuilder descBuf = new StringBuilder();
 
-                        keyBuf.append(String.format("%02X ", api.interrupt()));
-                        descBuf.append(String.format("INT %02X function ", api.interrupt()));
+                        if (api.function() == -1) {
+                            // Catch-all handler for this interrupt number (matches any AH).
+                            keyBuf.append(String.format("%02X", api.interrupt()));
+                            descBuf.append(String.format("INT %02X", api.interrupt()));
+                        } else {
+                            keyBuf.append(String.format("%02X ", api.interrupt()));
+                            descBuf.append(String.format("INT %02X function ", api.interrupt()));
 
-                        keyBuf.append(String.format("%02X", api.function()));
-                        descBuf.append(String.format("%02X", api.function()));
+                            keyBuf.append(String.format("%02X", api.function()));
+                            descBuf.append(String.format("%02X", api.function()));
 
-                        if (api.subfunction() != -1) {
-                            keyBuf.append(String.format(" %02X", api.subfunction()));
-                            descBuf.append(String.format("%02X", api.subfunction()));
+                            if (api.subfunction() != -1) {
+                                keyBuf.append(String.format(" %02X", api.subfunction()));
+                                descBuf.append(String.format("%02X", api.subfunction()));
+                            }
                         }
 
                         descBuf.append(" - ");

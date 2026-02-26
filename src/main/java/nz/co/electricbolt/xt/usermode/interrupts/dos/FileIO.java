@@ -340,6 +340,66 @@ public class FileIO {
         cpu.getReg().flags.setCarry(false);
     }
 
+    @Interrupt(function = 0x45, description = "Duplicate file handle")
+    public void duplicateFileHandle(final CPU cpu, final Trace trace, final @BX short fileHandle) {
+        final BaseFile baseFile = getFileHandleOrSetErrorResult(cpu, trace, fileHandle);
+        if (baseFile != null) {
+            trace.interrupt("Duplicating filehandle " + fileHandle + " to " + fileHandleCount);
+            // Map the new handle to the same BaseFile object (shared file position, as per DOS semantics).
+            baseFile.setFileHandle(fileHandle); // preserve original handle on the object
+            fileHandleMap.put(fileHandleCount, baseFile);
+            cpu.getReg().flags.setCarry(false);
+            cpu.getReg().AX.setValue(fileHandleCount);
+            fileHandleCount++;
+        }
+    }
+
+    @Interrupt(function = 0x46, description = "Force duplicate file handle")
+    public void forceDuplicateFileHandle(final CPU cpu, final Trace trace, final @BX short fileHandle,
+                                         final @CX short newFileHandle) {
+        final BaseFile baseFile = getFileHandleOrSetErrorResult(cpu, trace, fileHandle);
+        if (baseFile != null) {
+            trace.interrupt("Force duplicating filehandle " + fileHandle + " to " + newFileHandle);
+            // If newFileHandle is already open, close it first.
+            final BaseFile existing = fileHandleMap.get(newFileHandle);
+            if (existing != null) {
+                if (existing.close()) {
+                    fileHandleMap.remove(newFileHandle);
+                }
+            }
+            // Map newFileHandle to the same BaseFile (shared file position).
+            fileHandleMap.put(newFileHandle, baseFile);
+            cpu.getReg().flags.setCarry(false);
+        }
+    }
+
+    @Interrupt(function = 0x4F, description = "Find next matching file")
+    public void findNextMatchingFile(final CPU cpu, final Trace trace) {
+        final DiskTransferArea dta = new DiskTransferArea(cpu.getMemory(), (short) 0x0090, (short) 0x0080);
+        final short internalId = dta.getInternalId();
+        final FindFileData data = findFileMap.get(internalId);
+        if (data == null) {
+            setErrorResult(cpu, trace, ErrorCode.NoMoreFiles);
+            return;
+        }
+        final short nextIndex = (short) (data.fileIndex() + 1);
+        if (nextIndex >= data.files().length) {
+            findFileMap.remove(internalId);
+            setErrorResult(cpu, trace, ErrorCode.NoMoreFiles);
+            return;
+        }
+
+        final java.io.File file = data.files()[nextIndex];
+        final FileDateTime fileDateTime = new FileDateTime(file.lastModified());
+        dta.writeFileDate(fileDateTime.toDOSDate());
+        dta.writeFileTime(fileDateTime.toDOSTime());
+        dta.writeFileSize((int) file.length());
+        dta.writeFilename(file.getName());
+
+        findFileMap.put(internalId, new FindFileData(internalId, data.files(), nextIndex, dta));
+        cpu.getReg().flags.setCarry(false);
+    }
+
     @Interrupt(function = 0x56, description = "Rename file")
     public void renameFile(final CPU cpu, final Trace trace, final DirectoryTranslation directoryTranslation,
                            final @ASCIZ @DS @DX String source, final @ASCIZ @ES @DI String dest) {
